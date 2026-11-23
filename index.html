@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="nl" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uyl</title>
+<meta name="theme-color" content="#0e3a46">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Uyl">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a quiet, shipped reading app; the book does the talking
+   IDEA: a bookshelf of your own books, and a highlighter that turns a Spanish word into Dutch
+   PICTURE: the shelf of typographic covers on the start screen; the full-screen page when reading
+   COLOUR and TYPE: deep teal shelf, paper page, highlighter yellow; Literata to read, Figtree for UI
+   LAYOUT: library = "verder lezen" card + cover grid; reader = full screen, slim bar, progress line */
+:root{color-scheme:light dark;
+--shelf:light-dark(#0e3a46,#08222a);--shelf-ink:#eaf4f3;--page:light-dark(#ffffff,#121719);--ink:light-dark(#1d2427,#e3e7e5);
+--muted:light-dark(#62706f,#94a3a5);--line:light-dark(#e4e9ea,#273235);--hl:light-dark(#ffe45c,#8b7514);--hl-soft:light-dark(#fff6bf,#38321a);--accent:#ffd23f}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%}
+body{background:var(--shelf);color:var(--shelf-ink);font:16px/1.55 Figtree,system-ui,sans-serif;overflow-x:clip}
+button,input{font:inherit}button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+/* library */
+.lib{max-width:960px;margin:0 auto;padding:max(24px,env(safe-area-inset-top)) max(5vw,18px) 48px}
+.lib header{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.lib h1{font:600 30px/1.05 Literata,Georgia,serif;margin:0;flex:1}
+.lib h1 small{display:block;font:14px Figtree,sans-serif;opacity:.75;margin-top:6px}
+.add{min-height:44px;border-radius:999px;border:0;background:var(--accent);color:#14262b;font-weight:700;padding:0 18px;display:flex;align-items:center;gap:8px}
+.cont{display:grid;grid-template-columns:110px minmax(0,1fr);gap:18px;align-items:center;background:rgba(255,255,255,.07);border-radius:20px;padding:16px;margin-bottom:28px;cursor:pointer;border:0;color:inherit;text-align:left;width:100%}
+.cont .k{font-size:13px;opacity:.75;margin:0}
+.cont h2{font:600 22px/1.15 Literata,Georgia,serif;margin:2px 0 4px;text-wrap:balance}
+.cont p{margin:0;font-size:14px;opacity:.85}
+.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.18);margin-top:10px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.lib h3{font-size:15px;margin:0 0 12px;opacity:.85;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:20px 16px}
+.item{position:relative}.book{background:none;border:0;padding:0;color:inherit;text-align:left;width:100%;display:block}
+.book .t{font-size:14px;font-weight:600;margin:8px 0 0;line-height:1.3}
+.book .m{font-size:13px;opacity:.7}
+.del{position:absolute;top:6px;right:6px;width:32px;height:32px;border-radius:50%;border:0;background:rgba(0,0,0,.35);color:#fff;font-size:14px}
+.cover{aspect-ratio:2/3;border-radius:6px 12px 12px 6px;padding:14px 12px;display:flex;flex-direction:column;justify-content:space-between;color:#fff;box-shadow:inset 6px 0 0 rgba(0,0,0,.18),0 12px 24px -10px rgba(0,0,0,.6);position:relative;overflow:hidden}
+.cover::after{content:"";position:absolute;inset:auto -20% -30% -20%;height:55%;background:rgba(255,255,255,.08);border-radius:50%}
+.cover b{font:600 17px/1.15 Literata,Georgia,serif;text-wrap:balance;position:relative}
+.cover span{font-size:12px;opacity:.85;position:relative}
+.empty{background:rgba(255,255,255,.06);border:2px dashed rgba(255,255,255,.25);border-radius:20px;padding:28px;text-align:center}
+.empty p{margin:0 auto 14px;max-width:46ch;opacity:.85}
+.loadbox{background:rgba(255,255,255,.07);border-radius:16px;padding:14px 16px;margin-bottom:20px;font-size:14px;display:none}
+.loadbox .bar{margin-top:8px}
+/* reader */
+.reader{position:fixed;inset:0;background:var(--page);color:var(--ink);display:none;flex-direction:column;z-index:10}
+.reader.on{display:flex}
+.rbar{display:flex;align-items:center;gap:6px;padding:max(6px,env(safe-area-inset-top)) 8px 6px;border-bottom:1px solid var(--line);font-size:14px}
+.rbar .ttl{flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.ib{min-width:44px;height:44px;border:0;background:none;color:var(--ink);border-radius:12px;display:grid;place-items:center;font-weight:600}
+.ib svg{width:22px;height:22px}
+.pct{min-width:44px;text-align:right;color:var(--muted);padding-right:8px;font-variant-numeric:tabular-nums}
+.text{flex:1;overflow-y:auto;position:relative;-webkit-overflow-scrolling:touch}
+.col{max-width:680px;margin:0 auto;padding:24px 24px 30vh;font-family:Literata,Georgia,serif;font-size:var(--fs,20px);line-height:1.72}
+.col{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.col p{margin:0 0 .9em}
+.col p.h{text-align:center;font-weight:600;margin:1.6em 0 1em}
+.w{border-radius:3px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.w.sel{background:var(--hl);color:#1b1b1b}
+.w.ss{background:var(--hl-soft);color:inherit;box-shadow:0 0 0 2px var(--hl-soft)}
+.prog{height:3px;background:var(--line)}.prog i{display:block;height:100%;background:#0e3a46;width:0}
+:root[data-theme=dark] .prog i{background:var(--accent)}
+/* Nachtmodus: donkergroen, zachtwitte letters */
+.reader.night{--page:#133a31;--ink:#e6eee9;--muted:#9fbcb0;--line:#22503f;--hl:#d9bd55;--hl-soft:rgba(217,189,85,.22);color-scheme:dark}
+.reader.night .prog i{background:#d9bd55}
+.reader.night .bub,.reader.night .bub::after{background:#0b221c}
+.reader.night .bub{box-shadow:0 10px 30px rgba(0,0,0,.5),0 0 0 1px #2c5c4c}
+.ib.on{background:var(--line)}
+.bub{position:absolute;z-index:20;background:#14262b;color:#fff;border-radius:14px;padding:10px 14px;font:600 17px/1.35 Figtree,sans-serif;max-width:min(320px,88vw);box-shadow:0 10px 30px rgba(0,0,0,.35);display:none}
+.bub.long{font-weight:400;font-size:16px}
+.bub::after{content:"";position:absolute;left:var(--ax,50%);bottom:-7px;width:14px;height:14px;background:#14262b;transform:translateX(-50%) rotate(45deg);border-radius:2px}
+.bub.below::after{bottom:auto;top:-7px}
+.dots{display:inline-flex;gap:4px}.dots i{width:6px;height:6px;border-radius:50%;background:#fff;opacity:.4;animation:d 1s infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes d{50%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.dots i{animation:none;opacity:.8}}
+.selbtn{position:absolute;z-index:19;display:none;background:#14262b;color:#fff;border:0;border-radius:999px;padding:0 16px;min-height:40px;font-weight:600;font-size:14px}
+.credit{margin-top:40px;font-size:13px;opacity:.65}.credit a{color:inherit}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#14262b;color:#fff;padding:9px 16px;border-radius:999px;font-size:14px;z-index:30;display:none}
+@media(max-width:600px){.lib h1{font-size:26px}.cont{grid-template-columns:84px minmax(0,1fr)}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.col{padding:18px 20px 30vh}}
+</style>
+</head>
+<body>
+<main class="lib" id="lib">
+  <header>
+    <h1>Mijn boeken<small>Spaans lezen · tik op een woord, houd vast voor de hele zin</small></h1>
+    <button class="add" id="addBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Boek toevoegen</button>
+    <input type="file" id="file" accept=".pdf,application/pdf" multiple hidden>
+  </header>
+  <div class="loadbox" id="loadbox"><span id="loadtxt">Boek inlezen…</span><div class="bar"><i id="loadbar" style="width:0"></i></div></div>
+  <div id="shelf"></div>
+  <p class="credit">Woordenboek: <a href="https://www.wikdict.com/">WikDict</a>, gebaseerd op Wiktionary, licentie <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. Woorden die er niet in staan worden online vertaald.</p>
+</main>
+
+<section class="reader" id="reader" aria-label="Lezer">
+  <div class="rbar">
+    <button class="ib" id="back" aria-label="Terug naar bibliotheek"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="ttl" id="rTitle"></div>
+    <button class="ib" id="nightBtn" aria-label="Nachtmodus" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+    <button class="ib" id="fontBtn" aria-label="Lettergrootte">Aa</button>
+    <span class="pct" id="pct">0%</span>
+  </div>
+  <div class="prog"><i id="progbar"></i></div>
+  <div class="text" id="text"><div class="col" id="col"></div></div>
+  <div class="bub" id="bub"></div>
+</section>
+<div class="toast" id="toast"></div>
+
+<script src="lexicon.js"></script>
+<script>
+{
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ls = {get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+            set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }};
+const toast = t => { const el = $("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => el.style.display = "none", 2200); };
+
+/* ---------- storage (IndexedDB, with in-memory fallback) ---------- */
+let idb = null, mem = {};
+const openDB = () => new Promise(res => { try { const r = indexedDB.open("leeslingo", 1); r.onupgradeneeded = () => r.result.createObjectStore("books", {keyPath: "id"}); r.onsuccess = () => res(r.result); r.onerror = () => res(null); } catch (e) { res(null); } });
+const tx = (mode, fn) => new Promise((res, rej) => { const t = idb.transaction("books", mode); const s = t.objectStore("books"); const r = fn(s); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); });
+const saveBook = async b => { mem[b.id] = b; if (idb) try { await tx("readwrite", s => s.put(b)); return true; } catch (e) {} return false; };
+const getBook = async id => mem[id] || (idb ? await tx("readonly", s => s.get(id)) : null);
+const delBook = async id => { delete mem[id]; if (idb) try { await tx("readwrite", s => s.delete(id)); } catch (e) {} };
+
+/* meta (title, author, length, last opened) and positions live in localStorage */
+let meta = ls.get("ll-meta", {}), pos = ls.get("ll-pos", {});
+const saveMeta = () => ls.set("ll-meta", meta), savePos = () => ls.set("ll-pos", pos);
+
+/* ---------- library ---------- */
+const COLORS = ["#c4492f", "#2f5d8a", "#6c3f77", "#2c7a68", "#b07d22", "#8a2f4c"];
+const colorOf = s => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
+const cover = m => `<div class="cover" style="background:${colorOf(m.title)}"><b>${esc(m.title)}</b><span>${esc(m.author || "")}</span></div>`;
+const pctOf = m => Math.min(100, Math.round(((pos[m.id] || 0) / Math.max(1, m.n - 1)) * 100));
+
+function renderShelf() {
+  const list = Object.values(meta).sort((a, b) => (b.opened || b.added) - (a.opened || a.added));
+  if (!list.length) {
+    $("shelf").innerHTML = `<div class="empty"><p>Nog geen boeken. Voeg je Spaanse PDF's toe, bijvoorbeeld <i>Harry Potter y el prisionero de Azkaban</i> en <i>El idiota</i>. Ze worden ingelezen en bewaard in deze browser.</p><button class="add" style="margin:0 auto" onclick="document.getElementById('file').click()">Boek toevoegen</button></div>`;
+    return;
+  }
+  const last = list.find(m => m.opened);
+  const hero = last ? `<button class="cont" data-open="${last.id}">${cover(last)}<div><p class="k">Verder lezen</p><h2>${esc(last.title)}</h2><p>${esc(last.author || "")} · ${pctOf(last)}% gelezen</p><div class="bar"><i style="width:${pctOf(last)}%"></i></div></div></button>` : "";
+  $("shelf").innerHTML = hero + `<h3>Alle boeken</h3><div class="grid">` + list.map(m => `<div class="item"><button class="book" data-open="${m.id}" aria-label="Open ${esc(m.title)}">${cover(m)}<p class="t">${esc(m.title)}</p><span class="m">${m.opened ? pctOf(m) + "% gelezen" : "Nieuw"}</span></button><button class="del" data-del="${m.id}" aria-label="Verwijder ${esc(m.title)}">✕</button></div>`).join("") + `</div>`;
+}
+$("shelf").addEventListener("click", async e => {
+  const d = e.target.closest("[data-del]");
+  if (d) { const id = d.dataset.del; if (d.dataset.sure) { await delBook(id); delete meta[id]; delete pos[id]; saveMeta(); savePos(); renderShelf(); } else { d.dataset.sure = 1; d.textContent = "?"; toast("Tik nog eens om te verwijderen"); setTimeout(() => { delete d.dataset.sure; d.textContent = "✕"; }, 2500); } return; }
+  const o = e.target.closest("[data-open]"); if (o) openBook(o.dataset.open);
+});
+
+/* ---------- PDF import ---------- */
+const loadScript = src => new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+let pdfReady = null;
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+const ensurePdf = () => pdfReady || (pdfReady = loadScript(PDFJS + "pdf.min.js").then(() => loadScript(PDFJS + "pdf.worker.min.js")).then(() => { pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js"; }));
+
+function pageLines(items) {
+  const lines = [];
+  for (const it of items) {
+    if (!it.str) continue;
+    const x = it.transform[4], y = Math.round(it.transform[5]);
+    let L = lines.find(l => Math.abs(l.y - y) < 3);
+    if (!L) { L = {y, x, x2: x, s: []}; lines.push(L); }
+    L.s.push({x, t: it.str}); L.x = Math.min(L.x, x); L.x2 = Math.max(L.x2, x + (it.width || 0));
+  }
+  lines.sort((a, b) => b.y - a.y);
+  for (const L of lines) { L.s.sort((a, b) => a.x - b.x); L.t = L.s.map(s => s.t).join("").replace(/\s+/g, " ").trim(); }
+  return lines.filter(l => l.t && !/^\d{1,4}$/.test(l.t));
+}
+function addPage(st, items) {
+  const lines = pageLines(items); if (!lines.length) return;
+  const minX = Math.min(...lines.map(l => l.x)), maxX = Math.max(...lines.map(l => l.x2));
+  lines.forEach((L, i) => {
+    const prev = st.last, indent = L.x - minX > 8, dash = /^[—–-]/.test(L.t);
+    const prevShort = prev && prev.short, prevEnd = prev && /[.!?»”…:)]$/.test(prev.t);
+    const sameBlock = prev && indent && Math.abs(prev.x - L.x) < 3 && !prevShort;
+    let start = !st.paras.length || dash || (indent && !sameBlock && (i > 0 || prevEnd)) || (prevShort && prevEnd);
+    if (i === 0 && prev && !prevEnd) start = false;
+    if (start) st.paras.push(L.t);
+    else { const k = st.paras.length - 1, p = st.paras[k]; st.paras[k] = /[a-záéíóúñ]-$/i.test(p) ? p.slice(0, -1) + L.t : p + " " + L.t; }
+    st.last = {x: L.x, t: L.t, short: (maxX - L.x2) > (maxX - minX) * 0.12};
+  });
+}
+function nameOf(file) {
+  const n = file.name.replace(/\.pdf$/i, "");
+  if (/harry.*azkaban/i.test(n)) return {title: "Harry Potter y el prisionero de Azkaban", author: "J. K. Rowling"};
+  if (/idiota/i.test(n)) return {title: "El idiota", author: "Fiódor Dostoyevski"};
+  return {title: n.replace(/[_]+/g, " ").replace(/\s\d+$/, "").trim(), author: ""};
+}
+async function importPdf(file) {
+  $("loadbox").style.display = "block"; $("loadtxt").textContent = `${file.name} inlezen…`; $("loadbar").style.width = "0";
+  await ensurePdf();
+  const pdf = await pdfjsLib.getDocument({data: await file.arrayBuffer(), isEvalSupported: false}).promise;
+  const st = {paras: [], last: null};
+  for (let n = 1; n <= pdf.numPages; n++) {
+    addPage(st, (await (await pdf.getPage(n)).getTextContent()).items);
+    if (n % 10 === 0 || n === pdf.numPages) { $("loadbar").style.width = (n / pdf.numPages * 100) + "%"; $("loadtxt").textContent = `${file.name} inlezen… pagina ${n} van ${pdf.numPages}`; await new Promise(r => setTimeout(r)); }
+  }
+  if (st.paras.join("").length < 200) throw new Error("geen tekst");
+  const nm = nameOf(file), id = "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const kept = await saveBook({id, paras: st.paras});
+  meta[id] = {id, ...nm, n: st.paras.length, added: Date.now(), opened: 0}; saveMeta();
+  if (!kept) toast("Deze browser bewaart geen boeken: na sluiten moet je het opnieuw toevoegen");
+}
+$("addBtn").onclick = () => $("file").click();
+$("file").onchange = async e => {
+  for (const f of [...e.target.files]) {
+    try { await importPdf(f); toast(`${nameOf(f).title} toegevoegd`); }
+    catch (err) { toast(`${f.name} kon niet gelezen worden`); }
+  }
+  $("loadbox").style.display = "none"; e.target.value = ""; renderShelf();
+};
+
+/* ---------- reader ---------- */
+let cur = null, paras = [], from = 0, to = 0, fsz = ls.get("ll-fs", 20);
+const SIZES = [17, 20, 23];
+$("col").style.setProperty("--fs", fsz + "px");
+const isHead = t => t.length < 40 && (/^[IVXLC]+\.?$/.test(t) || /^(PRIMERA|SEGUNDA|TERCERA|CUARTA|QUINTA) PARTE$/i.test(t) || /^CAP[IÍ]TULO/i.test(t) || /^\d{1,2}$/.test(t));
+const wrap = t => esc(t).replace(/[A-Za-zÀ-ÿ]+/g, m => `<span class="w">${m}</span>`);
+const paraHtml = i => `<p data-i="${i}"${isHead(paras[i]) ? ' class="h"' : ""}>${wrap(paras[i])}</p>`;
+function renderRange(a, b) { let h = ""; for (let i = a; i < b; i++) h += paraHtml(i); return h; }
+
+async function openBook(id) {
+  const b = await getBook(id);
+  if (!b) { toast("Boek niet meer gevonden in deze browser: voeg het opnieuw toe"); return; }
+  cur = meta[id]; paras = b.paras; cur.opened = Date.now(); saveMeta();
+  $("lib").style.display = "none"; $("reader").classList.add("on"); $("rTitle").textContent = cur.title;
+  const p = Math.min(pos[id] || 0, paras.length - 1);
+  from = Math.max(0, p - 15); to = Math.min(paras.length, p + 60);
+  $("col").innerHTML = renderRange(from, to);
+  const el = $("col").querySelector(`[data-i="${p}"]`);
+  $("text").scrollTop = el ? el.offsetTop - 12 : 0;
+  updateProgress(p);
+  applyNight();
+  schedulePrefetch();
+}
+function closeBook() {
+  savePosition(); hideBub(); cur = null;
+  $("reader").classList.remove("on"); $("lib").style.display = "";
+  applyNight();
+  renderShelf();
+}
+$("back").onclick = closeBook;
+let night = ls.get("ll-night", false);
+function applyNight() {
+  $("reader").classList.toggle("night", night); $("nightBtn").classList.toggle("on", night); $("nightBtn").setAttribute("aria-pressed", night);
+  document.querySelector('meta[name="theme-color"]').content = cur && night ? "#133a31" : "#0e3a46";
+}
+$("nightBtn").onclick = () => { night = !night; ls.set("ll-night", night); applyNight(); };
+$("fontBtn").onclick = () => {
+  const top = topPara(); fsz = SIZES[(SIZES.indexOf(fsz) + 1) % SIZES.length]; ls.set("ll-fs", fsz);
+  $("col").style.setProperty("--fs", fsz + "px");
+  const el = $("col").querySelector(`[data-i="${top}"]`); if (el) $("text").scrollTop = el.offsetTop - 12;
+};
+function topPara() {
+  const st = $("text").scrollTop;
+  for (const p of $("col").children) if (p.offsetTop + p.offsetHeight > st + 10) return +p.dataset.i;
+  return from;
+}
+function updateProgress(i) { const v = Math.round(i / Math.max(1, paras.length - 1) * 100); $("pct").textContent = v + "%"; $("progbar").style.width = v + "%"; }
+function savePosition() { if (!cur) return; pos[cur.id] = topPara(); savePos(); }
+let scrollT = 0;
+$("text").addEventListener("scroll", () => {
+  hideBub();
+  const t = $("text"), col = $("col");
+  if (t.scrollTop + t.clientHeight > t.scrollHeight - 1200 && to < paras.length) {
+    const n = Math.min(paras.length, to + 50); col.insertAdjacentHTML("beforeend", renderRange(to, n)); to = n;
+    while (to - from > 260) { const f = col.firstElementChild, h = f.offsetHeight + parseFloat(getComputedStyle(f).marginBottom); f.remove(); from++; t.scrollTop -= h; }
+  }
+  if (t.scrollTop < 800 && from > 0) {
+    const n = Math.max(0, from - 50), before = t.scrollHeight; col.insertAdjacentHTML("afterbegin", renderRange(n, from)); from = n;
+    t.scrollTop += t.scrollHeight - before;
+    while (to - from > 260) { col.lastElementChild.remove(); to--; }
+  }
+  clearTimeout(scrollT); scrollT = setTimeout(() => { if (cur) { const i = topPara(); updateProgress(i); pos[cur.id] = i; savePos(); } }, 250);
+  schedulePrefetch();
+}, {passive: true});
+document.addEventListener("visibilitychange", () => { if (document.hidden) savePosition(); });
+window.addEventListener("pagehide", savePosition);
+
+/* ---------- translation ---------- */
+let sample = null, req = 0, tcache = ls.get("ll-dict", {}), pending = new Map(), busy = false, pauseUntil = 0, saveT = 0;
+const keep = () => { clearTimeout(saveT); saveT = setTimeout(() => ls.set("ll-dict", tcache), 400); };
+const bub = $("bub");
+function hideBub() { bub.style.display = "none"; document.querySelectorAll(".w.sel,.w.ss").forEach(e => e.classList.remove("sel", "ss")); }
+function place(rect, html, long) {
+  bub.innerHTML = html; bub.className = "bub" + (long ? " long" : ""); bub.style.display = "block";
+  const R = $("reader").getBoundingClientRect(), bw = bub.offsetWidth, bh = bub.offsetHeight;
+  const cx = rect.left + rect.width / 2, left = Math.max(8, Math.min(R.width - bw - 8, cx - bw / 2));
+  let top = rect.top - bh - 12; if (top < 70) { top = rect.bottom + 12; bub.classList.add("below"); }
+  bub.style.left = left + "px"; bub.style.top = top + "px"; bub.style.setProperty("--ax", (cx - left) + "px");
+}
+function sentenceOf(span) {
+  const p = span.closest("p"), full = p.textContent; let off = 0, n;
+  const wk = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+  while ((n = wk.nextNode())) { if (span.contains(n)) break; off += n.length; }
+  let acc = 0; for (const s of full.match(/[^.!?…]+[.!?…»”]*/g) || [full]) { if (off < acc + s.length) return s.trim(); acc += s.length; }
+  return full;
+}
+async function ask(prompt) {
+  const r = await sample(prompt, {modelTier: "quick", cache: true});
+  const m = r.text.match(/\{[\s\S]*\}/); return JSON.parse(m ? m[0] : r.text);
+}
+/* Zonder Claude (bv. op Netlify): gratis MyMemory-vertaling voor woorden die niet in het woordenboek staan */
+async function webTranslate(text) {
+  if (!navigator.onLine) return null;
+  try {
+    const r = await fetch("https://api.mymemory.translated.net/get?langpair=es|nl&q=" + encodeURIComponent(text));
+    const d = await r.json(), t = d && d.responseData && d.responseData.translatedText;
+    return t && t.toLowerCase() !== text.toLowerCase() && !/MYMEMORY|QUERY LENGTH/i.test(t) ? t : null;
+  } catch (e) { return null; }
+}
+const DOTS = '<span class="dots"><i></i><i></i><i></i></span>';
+const fmt = v => (Array.isArray(v) ? v : [v]).filter(Boolean).slice(0, 3).join(" · ") || "—";
+function learn(d) { for (const [k, v] of Object.entries(d || {})) { const t = Array.isArray(v) ? v : [v]; if (t.length && t[0]) tcache[k.toLowerCase()] = t.slice(0, 3); } keep(); }
+
+/* Background: translate every new word on screen and just below it, in one request */
+function visibleParas() {
+  const t = $("text"), top = t.scrollTop, bot = top + t.clientHeight * 2.5, out = [];
+  for (const p of $("col").children) { if (p.offsetTop + p.offsetHeight < top) continue; if (p.offsetTop > bot) break; out.push(p.textContent); }
+  return out;
+}
+async function prefetch() {
+  if (!sample || !cur || busy || Date.now() < pauseUntil) return;
+  const paras = visibleParas(), seen = new Set(), words = [];
+  for (const m of paras.join(" ").matchAll(/[A-Za-zÀ-ÿ]+/g)) { const k = m[0].toLowerCase(); if (!tcache[k] && !seen.has(k) && !LEXICON.lookup(k)) { seen.add(k); words.push(k); } }
+  if (!words.length) return;
+  const batch = words.slice(0, 140);
+  busy = true;
+  const job = ask(`Je bent een Spaans-Nederlands woordenboek voor een beginnende leerder. Hieronder staat een stukje tekst en een lijst woorden uit die tekst.\nGeef voor ELK woord de Nederlandse vertaling zoals het in deze tekst gebruikt wordt. Heeft een woord echt meerdere gangbare vertalingen, geef er maximaal 3, de beste eerst. Eigennamen blijven zoals ze zijn. Geen uitleg.\nTekst: """${paras.join("\n").slice(0, 3500)}"""\nWoorden: ${batch.join(", ")}\nAntwoord alleen met JSON, een object met elk woord (kleine letters) als sleutel en een lijst vertalingen als waarde, bv. {"casa":["huis"],"tiempo":["weer","tijd"]}`)
+    .then(learn)
+    .catch(e => { const c = e && e.code; pauseUntil = Date.now() + (c === "not_granted" ? 1e12 : c === "rate_limited" ? 60000 : 20000); })
+    .finally(() => { busy = false; batch.forEach(w => pending.delete(w)); setTimeout(prefetch, 300); });
+  batch.forEach(w => pending.set(w, job));
+}
+let preT = 0;
+const schedulePrefetch = () => { clearTimeout(preT); preT = setTimeout(prefetch, 700); };
+
+async function translateWord(span) {
+  hideBub(); span.classList.add("sel");
+  const w = span.textContent, k = w.toLowerCase(), id = ++req, rect = () => span.getBoundingClientRect();
+  const lex = LEXICON.lookup(w);
+  if (lex) return place(rect(), esc(fmt(lex.t)));
+  if (tcache[k]) return place(rect(), esc(fmt(tcache[k])));
+  place(rect(), DOTS);
+  if (!sample) {
+    const t = await webTranslate(w);
+    if (t) { tcache[k] = [t]; keep(); }
+    if (id === req) place(rect(), t ? esc(t) : (/^[A-ZÁÉÍÓÚÑ]/.test(w) ? esc(w) : "Niet gevonden"), !t);
+    return;
+  }
+  if (pending.has(k)) { await pending.get(k); if (tcache[k]) { if (id === req) place(rect(), esc(fmt(tcache[k]))); return; } }
+  try {
+    const d = await ask(`Spaans woord: "${w}". Zin: "${sentenceOf(span)}". Geef de Nederlandse vertaling in deze zin, bij echt meerdere gangbare vertalingen max 3, beste eerst. Geen uitleg. Alleen JSON: {"t":["..."]}`);
+    tcache[k] = (d.t || []).slice(0, 3); keep();
+    if (id === req) place(rect(), esc(fmt(tcache[k])));
+  } catch (e) { if (id === req) place(rect(), e && e.code === "rate_limited" ? "Even wachten en opnieuw tikken" : "Vertalen lukte niet, tik opnieuw", true); }
+}
+async function translateText(text, rect) {
+  const id = ++req; place(rect, DOTS, true);
+  if (!sample) { const t = await webTranslate(text); if (id === req) place(rect, t ? esc(t) : "Vertalen lukte niet (geen internet?)", true); return; }
+  try { const d = await ask(`Vertaal deze Spaanse tekst naar natuurlijk Nederlands. Geen uitleg.\nTekst: "${text}"\nAntwoord alleen met JSON: {"t":"vertaling"}`); if (id === req) place(rect, esc(d.t || "—"), true); }
+  catch (e) { if (id === req) place(rect, "Vertalen lukte niet, probeer opnieuw", true); }
+}
+/* Tik = woord, vasthouden = hele zin (geen tekstselectie, dus geen Android-menu) */
+let lpT = 0, lpStart = null, lpFired = false;
+$("col").addEventListener("pointerdown", e => {
+  const s = e.target.closest(".w"); lpFired = false; clearTimeout(lpT); if (!s) return;
+  lpStart = [e.clientX, e.clientY];
+  lpT = setTimeout(() => {
+    lpFired = true; hideBub();
+    const sent = sentenceOf(s), p = s.closest("p"), words = [...p.querySelectorAll(".w")].filter(w => sentenceOf(w) === sent);
+    words.forEach(w => w.classList.add("ss"));
+    const rs = words.map(w => w.getBoundingClientRect()), top = Math.min(...rs.map(r => r.top)), bottom = Math.max(...rs.map(r => r.bottom));
+    const rect = { left: Math.min(...rs.map(r => r.left)), top, bottom, width: Math.max(...rs.map(r => r.right)) - Math.min(...rs.map(r => r.left)), height: bottom - top };
+    if (navigator.vibrate) try { navigator.vibrate(15); } catch (x) {}
+    translateText(sent.slice(0, 1500), rect);
+  }, 450);
+});
+const lpCancel = () => clearTimeout(lpT);
+$("col").addEventListener("pointermove", e => { if (lpStart && Math.hypot(e.clientX - lpStart[0], e.clientY - lpStart[1]) > 10) lpCancel(); });
+["pointerup", "pointercancel", "pointerleave"].forEach(t => $("col").addEventListener(t, lpCancel));
+$("text").addEventListener("scroll", lpCancel, { passive: true });
+$("col").addEventListener("contextmenu", e => e.preventDefault());
+$("col").addEventListener("click", e => {
+  if (lpFired) { lpFired = false; return; }
+  const s = e.target.closest(".w");
+  if (s) translateWord(s); else hideBub();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") { if (bub.style.display === "block") hideBub(); else if (cur) closeBook(); } });
+
+/* ---------- start ---------- */
+renderShelf();
+LEXICON.load("dict.json").catch(() => toast("Woordenboek kon niet geladen worden"));
+try { if ("serviceWorker" in navigator && location.protocol === "https:" && !window.claude) navigator.serviceWorker.register("sw.js").catch(() => {}); } catch (e) {}
+openDB().then(db => { idb = db; });
+(window.claude ? claude.use("sample") : Promise.resolve(null)).then(s => { sample = s; schedulePrefetch(); }).catch(() => {});
+}
+</script>
+</body>
+</html>
