@@ -84,6 +84,9 @@ button,input{font:inherit}button{cursor:pointer}
 .bub.long{font-weight:400;font-size:16px}
 .bub::after{content:"";position:absolute;left:var(--ax,50%);bottom:-7px;width:14px;height:14px;background:#14262b;transform:translateX(-50%) rotate(45deg);border-radius:2px}
 .bub.below::after{bottom:auto;top:-7px}
+.bub .bt{display:flex;align-items:center;gap:10px}.bub .tx{flex:1}
+.say{flex:none;width:40px;height:40px;margin:-6px -8px -6px 0;border:0;border-radius:50%;background:rgba(255,255,255,.12);color:#fff;display:grid;place-items:center}
+.say svg{width:20px;height:20px}.say.on{background:#ffd23f;color:#14262b}
 .dots{display:inline-flex;gap:4px}.dots i{width:6px;height:6px;border-radius:50%;background:#fff;opacity:.4;animation:d 1s infinite}
 .dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
 @keyframes d{50%{opacity:1}}
@@ -297,8 +300,23 @@ window.addEventListener("pagehide", savePosition);
 let sample = null, req = 0, tcache = ls.get("ll-dict", {}), pending = new Map(), busy = false, pauseUntil = 0, saveT = 0;
 const keep = () => { clearTimeout(saveT); saveT = setTimeout(() => ls.set("ll-dict", tcache), 400); };
 const bub = $("bub");
-function hideBub() { bub.style.display = "none"; document.querySelectorAll(".w.sel,.w.ss").forEach(e => e.classList.remove("sel", "ss")); }
+function hideBub() { if (canSpeak) speechSynthesis.cancel(); bub.style.display = "none"; document.querySelectorAll(".w.sel,.w.ss").forEach(e => e.classList.remove("sel", "ss")); }
+/* Voorlezen: Spaanse uitspraak via de spraakfunctie van de telefoon */
+let sayText = "", esVoice = null;
+const SAY_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>';
+const canSpeak = "speechSynthesis" in window;
+function pickVoice() { try { const v = speechSynthesis.getVoices().filter(x => /^es/i.test(x.lang)); esVoice = v.find(x => /es[-_]ES/i.test(x.lang)) || v[0] || null; } catch (e) {} }
+if (canSpeak) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(text, btn) {
+  if (!canSpeak || !text) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text); u.lang = esVoice ? esVoice.lang : "es-ES"; if (esVoice) u.voice = esVoice; u.rate = 0.85;
+  if (btn) { btn.classList.add("on"); u.onend = u.onerror = () => btn.classList.remove("on"); }
+  speechSynthesis.speak(u);
+}
+bub.addEventListener("click", e => { const b = e.target.closest(".say"); if (b) { e.stopPropagation(); speak(sayText, b); } });
 function place(rect, html, long) {
+  if (canSpeak && sayText && html !== DOTS) html = '<div class="bt"><span class="tx">' + html + '</span><button class="say" aria-label="Voorlezen in het Spaans">' + SAY_SVG + '</button></div>';
   bub.innerHTML = html; bub.className = "bub" + (long ? " long" : ""); bub.style.display = "block";
   const R = $("reader").getBoundingClientRect(), bw = bub.offsetWidth, bh = bub.offsetHeight;
   const cx = rect.left + rect.width / 2, left = Math.max(8, Math.min(R.width - bw - 8, cx - bw / 2));
@@ -352,7 +370,7 @@ let preT = 0;
 const schedulePrefetch = () => { clearTimeout(preT); preT = setTimeout(prefetch, 700); };
 
 async function translateWord(span) {
-  hideBub(); span.classList.add("sel");
+  hideBub(); sayText = span.textContent; span.classList.add("sel");
   const w = span.textContent, k = w.toLowerCase(), id = ++req, rect = () => span.getBoundingClientRect();
   const lex = LEXICON.lookup(w);
   if (lex) return place(rect(), esc(fmt(lex.t)));
@@ -372,6 +390,7 @@ async function translateWord(span) {
   } catch (e) { if (id === req) place(rect(), e && e.code === "rate_limited" ? "Even wachten en opnieuw tikken" : "Vertalen lukte niet, tik opnieuw", true); }
 }
 async function translateText(text, rect) {
+  sayText = text;
   const id = ++req; place(rect, DOTS, true);
   if (!sample) { const t = await webTranslate(text); if (id === req) place(rect, t ? esc(t) : "Vertalen lukte niet (geen internet?)", true); return; }
   try { const d = await ask(`Vertaal deze Spaanse tekst naar natuurlijk Nederlands. Geen uitleg.\nTekst: "${text}"\nAntwoord alleen met JSON: {"t":"vertaling"}`); if (id === req) place(rect, esc(d.t || "—"), true); }
